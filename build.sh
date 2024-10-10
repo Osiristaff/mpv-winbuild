@@ -11,9 +11,7 @@ main() {
     simple_package=$3
 
     prepare
-    if [ "$target" == "32" ]; then
-        package "32" 
-    elif [ "$target" == "64" ]; then
+    if [ "$target" == "64" ]; then
         package "64"
     elif [ "$target" == "64-v3" ]; then
         package "64-v3"
@@ -24,7 +22,6 @@ main() {
         package "64-v3"
         package "aarch64"
     else [ "$target" == "all" ];
-        package "32"
         package "64"
         package "64-v3"
         package "aarch64"
@@ -46,7 +43,7 @@ package() {
         local arch="aarch64"
     fi
 
-    build $bit $arch $gcc_arch
+    build $bit $arch $gcc_arch $x86_64_level
     zip $bit $arch $x86_64_level
     sudo rm -rf $buildroot/build$bit/mpv-*
     sudo chmod -R a+rwx $buildroot/build$bit
@@ -56,11 +53,21 @@ build() {
     local bit=$1
     local arch=$2
     local gcc_arch=$3
+    local x86_64_level=$4
     
+    export PATH="/usr/local/fuchsia-clang/bin:$PATH"
+    wget https://github.com/Osiristaff/mpv-winbuild/releases/download/pgo/pgo.profdata
+    wget https://github.com/Osiristaff/mpv-winbuild/releases/download/blobs/minject.exe
+
     if [ "$compiler" == "clang" ]; then
         clang_option=(-DCMAKE_INSTALL_PREFIX=$clang_root -DMINGW_INSTALL_PREFIX=$buildroot/build$bit/install/$arch-w64-mingw32 -DCLANG_PACKAGES_LTO=ON)
     fi
-    cmake --fresh -DTARGET_ARCH=$arch-w64-mingw32 $gcc_arch -DCOMPILER_TOOLCHAIN=$compiler "${clang_option[@]}" $extra_option -DENABLE_CCACHE=ON -DSINGLE_SOURCE_LOCATION=$srcdir -DRUSTUP_LOCATION=$buildroot/install_rustup -G Ninja -H$gitdir -B$buildroot/build$bit
+
+    if [ "$arch" == "x86_64" ]; then
+        pgo_option=(-DCLANG_PACKAGES_PGO=USE -DCLANG_PACKAGES_PROFDATA_FILE="./pgo.profdata")
+    fi
+
+    cmake --fresh -DTARGET_ARCH=$arch-w64-mingw32 $gcc_arch -DCOMPILER_TOOLCHAIN=$compiler "${clang_option[@]}" "${pgo_option[@]}" $extra_option -DENABLE_CCACHE=ON -DSINGLE_SOURCE_LOCATION=$srcdir -DRUSTUP_LOCATION=$buildroot/install_rustup -G Ninja -H$gitdir -B$buildroot/build$bit
 
     ninja -C $buildroot/build$bit download || true
 
@@ -76,8 +83,17 @@ build() {
     fi
     ninja -C $buildroot/build$bit update
     ninja -C $buildroot/build$bit mpv-fullclean
-    
+
+    ninja -C $buildroot/build$bit mpv-removeprefix
+    ninja -C $buildroot/build$bit download
     ninja -C $buildroot/build$bit mpv
+
+    if [ "$arch" == "x86_64" ]; then
+        ninja -C $buildroot/build$bit mimalloc
+        sudo wine ./minject.exe $buildroot/build$bit/mpv-*/mpv.exe --inplace -y
+        cp $buildroot/build$bit/install/$arch-w64-mingw32/bin/mimalloc-{redirect,override}.dll $buildroot/build$bit/mpv-$arch$x86_64_level*/
+        sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/ffmpeg.exe --inplace -y
+    fi
 
     if [ -n "$(find $buildroot/build$bit -maxdepth 1 -type d -name "mpv*$arch*" -print -quit)" ] ; then
         echo "Successfully compiled $bit-bit. Continue"
@@ -95,10 +111,6 @@ zip() {
     local x86_64_level=$3
 
     mv $buildroot/build$bit/mpv-* $gitdir/release
-    if [ "$simple_package" != "true" ]; then
-        cd $gitdir/release/mpv-packaging-master
-        cp -r ./mpv-root/* ./$arch/d3dcompiler_43.dll ../mpv-$arch$x86_64_level*
-    fi
     cd $gitdir/release
     for dir in ./mpv*$arch$x86_64_level*; do
         if [ -d $dir ]; then
@@ -130,7 +142,6 @@ prepare() {
         cd ./release
         download_mpv_package
         cd ./mpv-packaging-master
-        7z x -y ./d3dcompiler*.7z
         cd ../..
     fi
 }
