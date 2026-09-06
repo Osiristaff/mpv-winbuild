@@ -9,7 +9,7 @@ on:
       build_target:
         description: "Build target"
         required: false
-        default: "all"
+        default: "64bit-v4"
         type: choice
         options:
         - 64bit-v4
@@ -231,7 +231,7 @@ jobs:
                     compiler: "${{ inputs.compiler }}",
                     needclean: true,
                     release: release,
-                    run_name: `CI Build: ${t} toolchain cache update`
+                    run_name: `CI Build: ${t} MPV`
                   }
                 })
               }

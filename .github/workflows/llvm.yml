@@ -17,12 +17,12 @@ on:
       trigger_toolchain:
         description: "Trigger toolchain build action after success build"
         required: false
-        default: false
+        default: true
         type: boolean
       build_target:
         description: "Toolchain build target"
         required: false
-        default: "all"
+        default: "64bit-v4"
         type: choice
         options:
         - 64bit-v4
@@ -32,12 +32,12 @@ on:
       trigger_build:
         description: "Trigger mpv build action after toolchain build"
         required: false
-        default: false
+        default: true
         type: boolean
       release:
         description: "Publish a release after mpv build"
         required: false
-        default: false
+        default: true
         type: boolean
       run_name:
         description: 'The name displayed in the list of workflow runs'
