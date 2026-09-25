@@ -44,7 +44,7 @@ runs:
 
         if [ $bit == "64-v4" ]; then
             arch="x86_64"
-            gcc_arch=-DMARCH=tigerlake
+            gcc_arch=-DMARCH=znver4
             arch_option=(-DMARCH_NAME=-v4)
             arch_level=-v4
         elif [ $bit == "64-nvl" ]; then
@@ -61,8 +61,6 @@ runs:
         set -x
         if [ "$compiler" == "clang" ]; then
           clang_option="-DCMAKE_INSTALL_PREFIX=$clang_root -DMINGW_INSTALL_PREFIX=$buildroot/build$bit/install/$arch-w64-mingw32"
-          wget https://github.com/Andarwinux/mpv-winbuild/releases/download/pgo/pgo.profdata
-          pgo_option=(-DCLANG_PACKAGES_PGO=USE -DCLANG_PACKAGES_PROFDATA_FILE="./pgo.profdata")
         fi
         cmake --fresh -DTARGET_ARCH=$arch-w64-mingw32 $gcc_arch -DCOMPILER_TOOLCHAIN=$compiler $clang_option "${arch_option[@]}" "${pgo_option[@]}" ${{ inputs.extra_option }} -DSINGLE_SOURCE_LOCATION=$srcdir -DTOOLCHAIN_FLAGS=-mno-sse4a -G Ninja -H$gitdir -B$buildroot/build$bit
         set +x

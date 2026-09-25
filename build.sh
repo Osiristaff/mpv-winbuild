@@ -29,7 +29,7 @@ package() {
     local bit=$1
     if [ $bit == "64-v4" ]; then
         local arch="x86_64"
-        local gcc_arch="-DMARCH=tigerlake"
+        local gcc_arch="-DMARCH=znver4"
         local arch_level="-v4"
     elif [ $bit == "64-nvl" ]; then
         local arch="x86_64"
@@ -54,12 +54,10 @@ build() {
     local arch_level=$4
 
     export PATH="/usr/local/fuchsia-clang/bin:$PATH"
-    wget https://github.com/Andarwinux/mpv-winbuild/releases/download/pgo/pgo.profdata
-    wget https://github.com/Andarwinux/mimalloc/raw/refs/heads/dev2/bin/minject.exe
+    wget https://github.com/microsoft/mimalloc/raw/refs/heads/main3/bin/minject.exe
 
     if [ "$compiler" == "clang" ]; then
         clang_option=(-DCMAKE_INSTALL_PREFIX=$clang_root -DMINGW_INSTALL_PREFIX=$buildroot/build$bit/install/$arch-w64-mingw32)
-        pgo_option=(-DCLANG_PACKAGES_PGO=USE -DCLANG_PACKAGES_PROFDATA_FILE="./pgo.profdata")
     fi
 
     if [ "$arch" == "x86_64" ]; then
@@ -72,7 +70,7 @@ build() {
         arch_option=(-DMARCH_NAME="-armv9.2-a")
     fi
 
-    cmake --fresh -DTARGET_ARCH=$arch-w64-mingw32 $gcc_arch -DCOMPILER_TOOLCHAIN=$compiler "${clang_option[@]}" "${pgo_option[@]}" "${arch_option[@]}" $extra_option -DENABLE_LEGACY_MPV=ON -DENABLE_CCACHE=ON -DQT_DISABLE_CCACHE=ON -DSINGLE_SOURCE_LOCATION=$srcdir -G Ninja -H$gitdir -B$buildroot/build$bit
+    cmake --fresh -DTARGET_ARCH=$arch-w64-mingw32 $gcc_arch -DCOMPILER_TOOLCHAIN=$compiler "${clang_option[@]}" "${pgo_option[@]}" "${arch_option[@]}" $extra_option -DSINGLE_SOURCE_LOCATION=$srcdir -G Ninja -S$gitdir -B$buildroot/build$bit
 
     ninja -C $buildroot/build$bit download || true
     ninja -C $buildroot/build$bit update || true
@@ -81,27 +79,15 @@ build() {
     ninja -C $buildroot/build$bit download
     ninja -C $buildroot/build$bit patch
 
-    ninja -C $buildroot/build$bit qbittorrent
-    ninja -C $buildroot/build$bit curl mediainfo mimalloc
-    ninja -C $buildroot/build$bit mpv mpv-menu-plugin mpv-debug-plugin mpc-qt
+    ninja -C $buildroot/build$bit curl mimalloc mpv
 
     sudo wine ./minject.exe $buildroot/build$bit/mpv-*/mpv.exe --inplace -y
-    sudo wine ./minject.exe $buildroot/build$bit/mpv-*/mpv-legacy.exe --inplace -y
     sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/ffmpeg.exe --inplace -y
     sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/curl.exe --inplace -y
-    sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/mujs.exe --inplace -y
-    sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/mediainfo.exe --inplace -y
-    sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/qbittorrent.exe --inplace -y
-    sudo wine ./minject.exe $buildroot/build$bit/install/$arch-w64-mingw32/bin/mpc-qt.exe --inplace -y
 
     llvm-strip -s $buildroot/build$bit/mpv-*/mpv.exe
-    llvm-strip -s $buildroot/build$bit/mpv-*/mpv-legacy.exe
     llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/ffmpeg.exe
     llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/curl.exe
-    llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/mujs.exe
-    llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/mediainfo.exe
-    llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/qbittorrent.exe
-    llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/mpc-qt.exe
     llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/mimalloc.dll
     llvm-strip -s $buildroot/build$bit/install/$arch-w64-mingw32/bin/vulkan-1.dll
 
@@ -144,10 +130,10 @@ zip() {
 }
 
 download_mpv_package() {
-    local package_url="https://codeload.github.com/AndarwinuxT/mpv-packaging/zip/master"
+    local package_url="https://codeload.github.com/Osiristaff/mpv-packaging/zip/master"
     if [ -e mpv-packaging.zip ]; then
         echo "Package exists. Check if it is newer.."
-        remote_commit=$(git ls-remote https://github.com/AndarwinuxT/mpv-packaging.git master | awk '{print $1;}')
+        remote_commit=$(git ls-remote https://github.com/Osiristaff/mpv-packaging.git master | awk '{print $1;}')
         local_commit=$(unzip -z mpv-packaging.zip | tail +2)
         if [ "$remote_commit" != "$local_commit" ]; then
             wget -qO mpv-packaging.zip $package_url
